@@ -51,7 +51,7 @@ MyFrame::MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size)
     menuMesh->Append(Toggle_Edges_And_Picking, _T("&Toggle Edges and Picking\tCtrl-E"), _T("Toggle edge visibility and enable picking"));
     menuMesh->Append(Clear_Selection, _T("&Clear Selection\tCtrl-C"), _T("Clear selected cells"));
     menuMesh->Append(Save_SubMesh, _T("&Save Sub-Mesh\tCtrl-S"), _T("Save selected sub-mesh"));
-    menuMesh->Append(Lasso_Selection, _T("&Lasso Selection\tCtrl-L"), _T("Enable lasso selection mode")); 
+    menuMesh->Append(Lasso_Selection, _T("&Lasso Selection\tL"), _T("Enable lasso selection mode")); 
 
     wxMenu* helpMenu = new wxMenu;
     helpMenu->Append(About, _T("&About...\tCtrl-A"), _T("Show about dialog"));
@@ -161,8 +161,13 @@ void MyFrame::OnClearSelection(wxCommandEvent& WXUNUSED(event))
     originalMesh->Modified();
     selectedCells->Reset();
 
+    auto interactor = m_pVTKWindow->GetRenderWindow()->GetInteractor();
+    interactor->SetInteractorStyle(vtkSmartPointer<vtkInteractorStyleTrackballCamera>::New());
+    stlActor->GetProperty()->EdgeVisibilityOff();
+
     m_pVTKWindow->Render();
     wxMessageBox("Selection cleared.", "Info", wxOK | wxICON_INFORMATION);
+
 }
 
 void MyFrame::OnSaveSubMesh(wxCommandEvent& WXUNUSED(event))
@@ -328,6 +333,9 @@ void MyFrame::OnLoadSTL(wxCommandEvent& WXUNUSED(event))
     pRenderer->AddActor(stlActor);
     pRenderer->ResetCamera();
 
+    auto interactor = m_pVTKWindow->GetRenderWindow()->GetInteractor();
+    interactor->SetInteractorStyle(vtkSmartPointer<vtkInteractorStyleTrackballCamera>::New());
+    stlActor->GetProperty()->EdgeVisibilityOff();
     m_pVTKWindow->Render();
 
     /*
@@ -398,14 +406,18 @@ void MyFrame::OnLassoSelection(wxCommandEvent& WXUNUSED(event))
         style->SetMesh(originalMesh);
         style->SetCellColors(cellColors);
         style->SetSelectedCells(selectedCells);
-
         interactor->SetInteractorStyle(style);
+
+        stlActor->GetProperty()->EdgeVisibilityOn();
+        stlActor->GetProperty()->SetEdgeColor(0.0, 1.0, 0.0);
+        stlActor->GetProperty()->SetLineWidth(2.0);
     }
     else
     {
         // Если текущий стиль - MyLassoInteractorStyle, переключаемся на стандартный стиль
-        vtkSmartPointer<vtkInteractorStyleTrackballCamera> style = vtkSmartPointer<vtkInteractorStyleTrackballCamera>::New();
-        interactor->SetInteractorStyle(style);
+        interactor->SetInteractorStyle(vtkSmartPointer<vtkInteractorStyleTrackballCamera>::New());
+        stlActor->GetProperty()->EdgeVisibilityOff();
+
     }
 
     m_pVTKWindow->Render();

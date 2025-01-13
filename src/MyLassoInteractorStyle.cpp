@@ -9,6 +9,12 @@
 #include <vtkCellPicker.h>
 #include <vtkRenderer.h>
 
+#include <vtkCamera.h>
+#include <vtkProperty.h>
+#include <vtkPolyDataNormals.h>
+
+#include <vtkFloatArray.h>
+
 vtkStandardNewMacro(MyLassoInteractorStyle);
 
 void MyLassoInteractorStyle::SetPicker(vtkSmartPointer<vtkCellPicker> picker)
@@ -80,32 +86,88 @@ void MyLassoInteractorStyle::OnLeftButtonUp()
     // Деактивируем лассо
     this->IsLassoActive = false;
 
+    // Получаем размеры окна рендеринга
+    int* windowSize = this->Renderer->GetRenderWindow()->GetSize();
+
+    // Захватываем Z-буфер
+    vtkSmartPointer<vtkFloatArray> zBuffer = vtkSmartPointer<vtkFloatArray>::New();
+    this->Renderer->GetRenderWindow()->GetZbufferData(0, 0, windowSize[0] - 1, windowSize[1] - 1, zBuffer);
+    if (!zBuffer) {
+        std::cerr << "Ошибка: Не удалось получить Z-буфер." << std::endl;
+        return;
+    }
+
+    // Преобразуем Z-буфер в массив
+    float* zBufferData = zBuffer->GetPointer(0);
+
+    // Получаем параметры камеры
+    vtkCamera* camera = Renderer->GetActiveCamera();
+    double nearPlane = camera->GetClippingRange()[0];
+    double farPlane = camera->GetClippingRange()[1];
+
+    // Вычисляем центр модели
+    double bounds[6];
+    Mesh->GetBounds(bounds);
+    double modelCenter[3] = {
+        (bounds[0] + bounds[1]) / 2.0,
+        (bounds[2] + bounds[3]) / 2.0,
+        (bounds[4] + bounds[5]) / 2.0
+    };
+
+    // Вычисляем расстояние от камеры до центра модели
+    double cameraPosition[3];
+    camera->GetPosition(cameraPosition);
+    double distanceToModel = sqrt(pow(cameraPosition[0] - modelCenter[0], 2) +
+        pow(cameraPosition[1] - modelCenter[1], 2) +
+        pow(cameraPosition[2] - modelCenter[2], 2));
+
+    // Устанавливаем динамическое значение tolerance
+    double k = 0.00001; // Коэффициент масштабирования
+    double tolerance = k * distanceToModel;
+
     // Определяем элементы сетки, попадающие в замкнутую область
-    vtkSmartPointer<vtkIdList> selectedCells = vtkSmartPointer<vtkIdList>::New();
     for (vtkIdType cellId = 0; cellId < Mesh->GetNumberOfCells(); ++cellId) {
         double bounds[6];
         Mesh->GetCellBounds(cellId, bounds);
 
-        // Преобразуем границы ячейки в экранные координаты
+        // Вычисляем центр ячейки
         double center[3] = {
             (bounds[0] + bounds[1]) / 2.0,
             (bounds[2] + bounds[3]) / 2.0,
             (bounds[4] + bounds[5]) / 2.0
         };
+
+        // Преобразуем центр элемента в экранные координаты
         double displayCoord[3];
         this->Renderer->SetWorldPoint(center[0], center[1], center[2], 1.0);
         this->Renderer->WorldToDisplay();
         this->Renderer->GetDisplayPoint(displayCoord);
 
+        // Проверяем, находится ли точка в пределах окна
+        int screenX = static_cast<int>(displayCoord[0]);
+        int screenY = static_cast<int>(displayCoord[1]);
+        if (screenX < 0 || screenX >= windowSize[0] || screenY < 0 || screenY >= windowSize[1]) {
+            continue;
+        }
+
+        // Получаем значение глубины из Z-буфера
+        int zIndex = screenY * windowSize[0] + screenX;
+        double zBufferValue = zBufferData[zIndex];
+
+        // Проверяем видимость элемента
+        if (displayCoord[2] - zBufferValue > tolerance) {
+            continue; // Элемент не видим
+        }
+
         // Проверяем, попадает ли центр ячейки в замкнутую область
         if (IsPointInPolygon(displayCoord[0], displayCoord[1], LassoPoints)) {
-            selectedCells->InsertNextId(cellId);
+            this->SelectedCells->InsertUniqueId(cellId);
         }
     }
 
     // Подсвечиваем выбранные элементы
-    for (vtkIdType i = 0; i < selectedCells->GetNumberOfIds(); ++i) {
-        vtkIdType cellId = selectedCells->GetId(i);
+    for (vtkIdType i = 0; i < this->SelectedCells->GetNumberOfIds(); ++i) {
+        vtkIdType cellId = this->SelectedCells->GetId(i);
         CellColors->SetTuple3(cellId, 255, 0, 0); // Красный цвет для выделенных элементов
     }
 
@@ -113,6 +175,7 @@ void MyLassoInteractorStyle::OnLeftButtonUp()
     Mesh->Modified();
     Renderer->GetRenderWindow()->Render();
 }
+
 
 void MyLassoInteractorStyle::OnMouseWheelForward()
 {
@@ -129,17 +192,6 @@ void MyLassoInteractorStyle::DrawLasso()
     if (!IsLassoActive || LassoPoints.empty()) {
         return;
     }
-
-    // Устанавливаем цвет и толщину линии
-    //glColor3f(1.0, 0.0, 0.0); // Красный цвет
-    //glLineWidth(2.0);         // Толщина линии
-
-    //// Рисуем траекторию лассо
-    //glBegin(GL_LINE_STRIP);
-    //for (const auto& point : LassoPoints) {
-    //    glVertex2i(point[0], point[1]);
-    //}
-    //glEnd();
 }
 
 bool MyLassoInteractorStyle::IsPointInPolygon(double x, double y, const std::vector<std::array<int, 2>>& polygon)
