@@ -34,6 +34,7 @@ add_executable(MAIN
   src/main.cpp
   src/MyFrame.cpp
   src/MyInteractorStyle.cpp
+  src/MyLassoInteractorStyle.cpp
 )
 
 # Set target properties for MAIN

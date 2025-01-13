@@ -32,6 +32,8 @@
 #include <vtkPointData.h>
 
 #include "MyInteractorStyle.h"
+#include "MyLassoInteractorStyle.h"
+
 
 #define MY_FRAME      101
 #define MY_VTK_WINDOW 102
@@ -49,7 +51,7 @@ public:
     void OnToggleEdgesAndPicking(wxCommandEvent& event);
     void OnSaveSubMesh(wxCommandEvent& event);
     void OnClearSelection(wxCommandEvent& event);
-
+    void OnLassoSelection(wxCommandEvent& event);
 protected:
     void ConstructVTK();
     void ConfigureVTK();

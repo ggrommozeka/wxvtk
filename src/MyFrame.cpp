@@ -20,7 +20,8 @@ enum
     Reset_View,
     Toggle_Edges_And_Picking,
     Save_SubMesh,
-    Clear_Selection
+    Clear_Selection,
+    Lasso_Selection 
 };
 
 BEGIN_EVENT_TABLE(MyFrame, wxFrame)
@@ -31,6 +32,7 @@ EVT_MENU(Reset_View, MyFrame::OnResetView)
 EVT_MENU(Toggle_Edges_And_Picking, MyFrame::OnToggleEdgesAndPicking)
 EVT_MENU(Save_SubMesh, MyFrame::OnSaveSubMesh)
 EVT_MENU(Clear_Selection, MyFrame::OnClearSelection)
+EVT_MENU(Lasso_Selection, MyFrame::OnLassoSelection)
 END_EVENT_TABLE()
 
 MyFrame::MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size)
@@ -49,6 +51,7 @@ MyFrame::MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size)
     menuMesh->Append(Toggle_Edges_And_Picking, _T("&Toggle Edges and Picking\tCtrl-E"), _T("Toggle edge visibility and enable picking"));
     menuMesh->Append(Clear_Selection, _T("&Clear Selection\tCtrl-C"), _T("Clear selected cells"));
     menuMesh->Append(Save_SubMesh, _T("&Save Sub-Mesh\tCtrl-S"), _T("Save selected sub-mesh"));
+    menuMesh->Append(Lasso_Selection, _T("&Lasso Selection\tCtrl-L"), _T("Enable lasso selection mode")); 
 
     wxMenu* helpMenu = new wxMenu;
     helpMenu->Append(About, _T("&About...\tCtrl-A"), _T("Show about dialog"));
@@ -377,5 +380,33 @@ void MyFrame::OnResetView(wxCommandEvent& WXUNUSED(event))
     pRenderer->GetActiveCamera()->SetFocalPoint(initialCameraFocalPoint);
     pRenderer->GetActiveCamera()->SetViewUp(0.0, 1.0, 0.0);
     pRenderer->ResetCamera();
+    m_pVTKWindow->Render();
+}
+
+void MyFrame::OnLassoSelection(wxCommandEvent& WXUNUSED(event))
+{
+    auto interactor = m_pVTKWindow->GetRenderWindow()->GetInteractor();
+
+    // Проверяем текущий стиль взаимодействия
+    if (interactor->GetInteractorStyle() == nullptr ||
+        !MyLassoInteractorStyle::SafeDownCast(interactor->GetInteractorStyle()))
+    {
+        // Если текущий стиль не является MyLassoInteractorStyle, переключаемся на него
+        vtkSmartPointer<MyLassoInteractorStyle> style = vtkSmartPointer<MyLassoInteractorStyle>::New();
+        style->SetPicker(cellPicker);
+        style->SetRenderer(pRenderer);
+        style->SetMesh(originalMesh);
+        style->SetCellColors(cellColors);
+        style->SetSelectedCells(selectedCells);
+
+        interactor->SetInteractorStyle(style);
+    }
+    else
+    {
+        // Если текущий стиль - MyLassoInteractorStyle, переключаемся на стандартный стиль
+        vtkSmartPointer<vtkInteractorStyleTrackballCamera> style = vtkSmartPointer<vtkInteractorStyleTrackballCamera>::New();
+        interactor->SetInteractorStyle(style);
+    }
+
     m_pVTKWindow->Render();
 }
