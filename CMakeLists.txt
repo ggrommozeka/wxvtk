@@ -29,21 +29,21 @@ add_library(wxVTKRenderWindowInteractor SHARED src/wxVTKRenderWindowInteractor.c
 target_include_directories(wxVTKRenderWindowInteractor PUBLIC include)
 target_link_libraries(wxVTKRenderWindowInteractor ${VTK_LIBRARIES} ${wxWidgets_LIBRARIES})
 
-# Add MAIN executable
-add_executable(MAIN
+# Add project executable
+add_executable(main
   src/main.cpp
   src/MyFrame.cpp
   src/MyInteractorStyle.cpp
   src/MyLassoInteractorStyle.cpp
 )
 
-# Set target properties for MAIN
-set_target_properties(MAIN PROPERTIES WIN32_EXECUTABLE TRUE)
-target_include_directories(MAIN PRIVATE include)
-target_compile_definitions(MAIN PUBLIC WXUSINGDLL)
+# Set target properties
+set_target_properties(main PROPERTIES WIN32_EXECUTABLE TRUE)
+target_include_directories(main PRIVATE include)
+target_compile_definitions(main PUBLIC WXUSINGDLL)
 
-# Link libraries to MAIN
-target_link_libraries(MAIN
+# Link libraries to main
+target_link_libraries(main
   wxVTKRenderWindowInteractor
   ${VTK_LIBRARIES}
   ${wxWidgets_LIBRARIES}

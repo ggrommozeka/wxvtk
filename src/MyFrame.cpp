@@ -1,16 +1,5 @@
 #include "MyFrame.h"
-#include "wx/wxprec.h"
-
-#ifdef __BORLANDC__
-    #pragma hdrstop
-#endif
-
-#ifndef WX_PRECOMP
-    #include "wx/wx.h"
-#endif
-
-#include <wx/filedlg.h>
-#include <wx/msgdlg.h>
+#include "wx/wx.h"
 
 enum
 {
@@ -63,9 +52,6 @@ MyFrame::MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size)
     menuBar->Append(helpMenu, _T("&Help"));
 
     SetMenuBar(menuBar);
-
-    //CreateStatusBar(2);
-    //SetStatusText(_T("Drag the mouse here! (wxWidgets 3.0.3)"));
 
     m_pVTKWindow = new wxVTKRenderWindowInteractor(this, MY_VTK_WINDOW);
     m_pVTKWindow->UseCaptureMouseOn();
@@ -224,7 +210,7 @@ void MyFrame::OnSaveSubMesh(wxCommandEvent& WXUNUSED(event))
             objFile << "v " << coords[0] << " " << coords[1] << " " << coords[2] << "\n";
         }
 
-        // Write normals (if available)
+        // Write normals 
         vtkDataArray* normals = subMesh->GetPointData()->GetNormals();
         if (normals) {
             for (vtkIdType i = 0; i < normals->GetNumberOfTuples(); ++i) {
@@ -242,19 +228,15 @@ void MyFrame::OnSaveSubMesh(wxCommandEvent& WXUNUSED(event))
         while (cells->GetNextCell(npts, pts)) {
             objFile << "f";
             for (vtkIdType i = 0; i < npts; ++i) {
-                objFile << " " << (pts[i] + 1); // OBJ format uses 1-based indexing
+                objFile << " " << (pts[i] + 1); // OBJ: starts from 1!!
                 if (normals) {
-                    objFile << "//" << (pts[i] + 1); // Add normal index
+                    objFile << "//" << (pts[i] + 1); // OBJ: starts from 1!!
                 }
             }
             objFile << "\n";
         }
 
         objFile.close();
-
-        wxString msg;
-        msg.Printf(_T("OBJ file saved successfully, number of mesh elements =  %d"), triangleCount);
-        wxMessageBox(msg, "Success", wxOK | wxICON_INFORMATION);
     }
     else {
         wxMessageBox("Unsupported file format!", "Error", wxOK | wxICON_ERROR);
@@ -312,7 +294,7 @@ void MyFrame::OnLoadSTL(wxCommandEvent& WXUNUSED(event))
 
     cellColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
     cellColors->SetNumberOfComponents(3);
-    cellColors->SetName("CellColors");
+
     for (vtkIdType i = 0; i < originalMesh->GetNumberOfCells(); ++i) {
         cellColors->InsertNextTuple3(255, 255, 255);
     }
@@ -337,49 +319,6 @@ void MyFrame::OnLoadSTL(wxCommandEvent& WXUNUSED(event))
     interactor->SetInteractorStyle(vtkSmartPointer<vtkInteractorStyleTrackballCamera>::New());
     stlActor->GetProperty()->EdgeVisibilityOff();
     m_pVTKWindow->Render();
-
-    /*
-    wxFileDialog openFileDialog(this, _T("Open STL file"), "", "", _T("STL files (*.stl)|*.stl"), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
-    if (openFileDialog.ShowModal() == wxID_CANCEL)
-        return;
-
-    wxString path = openFileDialog.GetPath();
-
-    vtkSmartPointer<vtkSTLReader> stlReader = vtkSmartPointer<vtkSTLReader>::New();
-    stlReader->SetFileName(path.mb_str().data());
-
-    vtkSmartPointer<vtkPolyDataMapper> stlMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-    stlMapper->SetInputConnection(stlReader->GetOutputPort());
-
-    stlActor->SetMapper(stlMapper);
-    stlReader->Update();
-    originalMesh = stlReader->GetOutput();
-
-    cellColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
-    cellColors->SetNumberOfComponents(3);
-    cellColors->SetName("CellColors");
-    for (vtkIdType i = 0; i < originalMesh->GetNumberOfCells(); ++i) {
-        cellColors->InsertNextTuple3(255, 255, 255);
-    }
-    originalMesh->GetCellData()->SetScalars(cellColors);
-
-    pRenderer->RemoveAllViewProps();
-
-    double bounds[6];
-    stlActor->GetBounds(bounds);
-    double centerX = (bounds[0] + bounds[1]) / 2.0;
-    double centerY = (bounds[2] + bounds[3]) / 2.0;
-    double centerZ = (bounds[4] + bounds[5]) / 2.0;
-    pRenderer->GetActiveCamera()->SetFocalPoint(centerX, centerY, centerZ);
-    pRenderer->GetActiveCamera()->SetPosition(centerX, centerY, centerZ + (bounds[5] - bounds[4]) * 2.0);
-    pRenderer->GetActiveCamera()->SetViewUp(0.0, 1.0, 0.0);
-    pRenderer->ResetCamera();
-
-    pRenderer->AddActor(stlActor);
-    pRenderer->ResetCamera();
-
-    m_pVTKWindow->Render();
-    */
 }
 
 void MyFrame::OnResetView(wxCommandEvent& WXUNUSED(event))
@@ -395,11 +334,10 @@ void MyFrame::OnLassoSelection(wxCommandEvent& WXUNUSED(event))
 {
     auto interactor = m_pVTKWindow->GetRenderWindow()->GetInteractor();
 
-    // Проверяем текущий стиль взаимодействия
     if (interactor->GetInteractorStyle() == nullptr ||
         !MyLassoInteractorStyle::SafeDownCast(interactor->GetInteractorStyle()))
     {
-        // Если текущий стиль не является MyLassoInteractorStyle, переключаемся на него
+		// if current style is not MyLassoInteractorStyle, switch to it
         vtkSmartPointer<MyLassoInteractorStyle> style = vtkSmartPointer<MyLassoInteractorStyle>::New();
         style->SetPicker(cellPicker);
         style->SetRenderer(pRenderer);
@@ -414,7 +352,7 @@ void MyFrame::OnLassoSelection(wxCommandEvent& WXUNUSED(event))
     }
     else
     {
-        // Если текущий стиль - MyLassoInteractorStyle, переключаемся на стандартный стиль
+		// if current style is MyLassoInteractorStyle, switch to default style
         interactor->SetInteractorStyle(vtkSmartPointer<vtkInteractorStyleTrackballCamera>::New());
         stlActor->GetProperty()->EdgeVisibilityOff();
 

@@ -31,16 +31,16 @@ protected:
     void OnMouseWheelBackward() override;
 
 private:
-    void DrawLasso(); // Метод для отрисовки траектории лассо
-    bool IsPointInPolygon(double x, double y, const std::vector<std::array<int, 2>>& polygon); // Алгоритм "Point in Polygon"
+	void DrawLasso(); // to do
+    bool IsPointInPolygon(double x, double y, const std::vector<std::array<int, 2>>& polygon);
 
     vtkSmartPointer<vtkCellPicker> Picker;
     vtkSmartPointer<vtkRenderer> Renderer;
     vtkSmartPointer<vtkPolyData> Mesh;
     vtkSmartPointer<vtkUnsignedCharArray> CellColors;
     vtkSmartPointer<vtkIdList> SelectedCells;
-    bool IsLassoActive = false; // Флаг, указывающий, что лассо активно
-    std::vector<std::array<int, 2>> LassoPoints; // Точки траектории лассо
+    bool IsLassoActive = false; 
+    std::vector<std::array<int, 2>> LassoPoints; 
 };
 
 #endif // MYLASSOINTERACTORSTYLE_H
