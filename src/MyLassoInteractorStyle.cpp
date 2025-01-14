@@ -118,11 +118,27 @@ void MyLassoInteractorStyle::OnLeftButtonUp()
 
     for (int i = 0; i < 8; ++i) {
         // bounding box vertices
-        double corner[3] = {
-            (i & 1) ? bounds[1] : bounds[0], // x
-            (i & 2) ? bounds[3] : bounds[2], // y
-            (i & 4) ? bounds[5] : bounds[4]  // z
-        };
+        double corner[3];
+        if (i % 2 == 0) {
+            corner[0] = bounds[0]; // x -> minX
+        }
+        else {
+            corner[0] = bounds[1]; // x -> maxX
+        }
+
+        if ((i / 2) % 2 == 0) {
+            corner[1] = bounds[2]; // y -> minY
+        }
+        else {
+            corner[1] = bounds[3]; // y -> maxY
+        }
+
+        if ((i / 4) % 2 == 0) {
+            corner[2] = bounds[4]; // z -> minZ
+        }
+        else {
+            corner[2] = bounds[5]; // z -> maxZ
+        }
 
 		// calculate the distance from the camera to the current corner
         double distance = sqrt(
