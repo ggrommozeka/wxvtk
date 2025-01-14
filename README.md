@@ -53,10 +53,11 @@ Ensure that VTK 8.0 is built in **Release** mode for optimal performance. You ca
 
 ## Build Instructions for the Project
 1. Open **Visual Studio 2022**.
-2. Open the `CMakeLists.txt` file in the project folder.
+2. Open the project folder.
 3. Configure and generate build files:
    - Ensure the target platform is **x64**.
    - Verify that CMake detects the updated paths for wxWidgets and VTK.
+   - Use `CMakeLists.txt` to build project
 4. Build the project:
    - Click **Build > Build Solution** or press `Ctrl+Shift+B`.
 
