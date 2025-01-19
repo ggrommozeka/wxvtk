@@ -1,4 +1,6 @@
 #include "MyLassoInteractorStyle.h"
+#include <wx/msgdlg.h>
+
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderWindow.h>
 #include <vtkCellData.h>
@@ -12,8 +14,11 @@
 #include <vtkCamera.h>
 #include <vtkProperty.h>
 #include <vtkPolyDataNormals.h>
-
 #include <vtkFloatArray.h>
+
+#include <vtkHardwareSelector.h>
+#include <vtkSelectionNode.h>
+#include <vtkSelection.h>
 
 vtkStandardNewMacro(MyLassoInteractorStyle);
 
@@ -77,129 +82,86 @@ void MyLassoInteractorStyle::OnMouseMove()
     this->GetInteractor()->Render();
 }
 
+
 void MyLassoInteractorStyle::OnLeftButtonUp()
 {
     if (!IsLassoActive) {
         return;
     }
 
-	// deactivate lasso
+    // deactivate lasso
     this->IsLassoActive = false;
 
-	// get the rendering window size
-    int* windowSize = this->Renderer->GetRenderWindow()->GetSize();
+    // !hardware selector instead Z-buffer
+    vtkSmartPointer<vtkHardwareSelector> selector = vtkSmartPointer<vtkHardwareSelector>::New();
+    selector->SetRenderer(Renderer);
 
-	// grab the Z-buffer
-    vtkSmartPointer<vtkFloatArray> zBuffer = vtkSmartPointer<vtkFloatArray>::New();
-    this->Renderer->GetRenderWindow()->GetZbufferData(0, 0, windowSize[0] - 1, windowSize[1] - 1, zBuffer);
-    if (!zBuffer) {
-        std::cerr << "Error: failed to get Z-buffer" << std::endl;
+    // set rectangular boundary of lasso
+    int minX = std::numeric_limits<int>::max();
+    int minY = std::numeric_limits<int>::max();
+    int maxX = std::numeric_limits<int>::min();
+    int maxY = std::numeric_limits<int>::min();
+
+    for (const auto& point : LassoPoints) {
+        minX = std::min(minX, point[0]);
+        minY = std::min(minY, point[1]);
+        maxX = std::max(maxX, point[0]);
+        maxY = std::max(maxY, point[1]);
+    }
+    selector->SetArea(minX, minY, maxX, maxY);
+
+	// set cell selection mode
+    selector->SetFieldAssociation(vtkDataObject::FIELD_ASSOCIATION_CELLS);
+
+	// select cells inside the lasso boundary
+    vtkSmartPointer<vtkSelection> selection = selector->Select();
+
+	// check if any cells were selected by hardware selector
+    if (!selection || selection->GetNumberOfNodes() == 0) {
+        wxMessageBox("No cells selected.", "Error", wxOK | wxICON_ERROR);
         return;
     }
 
-	// convert Z-buffer to an array
-    float* zBufferData = zBuffer->GetPointer(0);
-
-	// get camera parameters
-    vtkCamera* camera = Renderer->GetActiveCamera();
-    double nearPlane = camera->GetClippingRange()[0];
-    double farPlane = camera->GetClippingRange()[1];
-
-    // get model bounding box
-    double bounds[6];
-    Mesh->GetBounds(bounds);
-
-	// calculate the distance from the camera to the bounding box
-    double cameraPosition[3];
-    camera->GetPosition(cameraPosition);
-
-	// calculate the distance from the camera to the bounding box
-    double minDistanceToBounds = std::numeric_limits<double>::max();
-
-    for (int i = 0; i < 8; ++i) {
-        // bounding box vertices
-        double corner[3];
-        if (i % 2 == 0) {
-            corner[0] = bounds[0]; // x -> minX
-        }
-        else {
-            corner[0] = bounds[1]; // x -> maxX
-        }
-
-        if ((i / 2) % 2 == 0) {
-            corner[1] = bounds[2]; // y -> minY
-        }
-        else {
-            corner[1] = bounds[3]; // y -> maxY
-        }
-
-        if ((i / 4) % 2 == 0) {
-            corner[2] = bounds[4]; // z -> minZ
-        }
-        else {
-            corner[2] = bounds[5]; // z -> maxZ
-        }
-
-		// calculate the distance from the camera to the current corner
-        double distance = sqrt(
-            pow(cameraPosition[0] - corner[0], 2) +
-            pow(cameraPosition[1] - corner[1], 2) +
-            pow(cameraPosition[2] - corner[2], 2)
-        );
-
-        if (distance < minDistanceToBounds) {
-            minDistanceToBounds = distance;
-        }
+    vtkSmartPointer<vtkSelectionNode> selectionNode = selection->GetNode(0);
+    
+	// check if node contains on cell indices
+    vtkSmartPointer<vtkIdTypeArray> selectedIds =
+        vtkIdTypeArray::SafeDownCast(selectionNode->GetSelectionList());
+    
+    if (!selectedIds) {
+        wxMessageBox("No cell indices found in selection.", "Error", wxOK | wxICON_ERROR);
+        return;
     }
 
-    // set dynamic tolerance
-    double k = 0.00001; // scale factor
-    double tolerance = k * minDistanceToBounds;
+	// cycle through selected cell indices
+    for (vtkIdType i = 0; i < selectedIds->GetNumberOfTuples(); ++i) {
+        vtkIdType cellId = selectedIds->GetValue(i);
 
-	// find selected triangle cells using centroid  
-    for (vtkIdType cellId = 0; cellId < Mesh->GetNumberOfCells(); ++cellId) {
+        // get bounds of the cell
         double bounds[6];
         Mesh->GetCellBounds(cellId, bounds);
 
-		// calculate centroid of the cell
+        // calculate centroid
         double center[3] = {
             (bounds[0] + bounds[1]) / 2.0,
             (bounds[2] + bounds[3]) / 2.0,
             (bounds[4] + bounds[5]) / 2.0
         };
 
-		// convert world point to display point
+        // convert world centroid to display point
         double displayCoord[3];
-        this->Renderer->SetWorldPoint(center[0], center[1], center[2], 1.0);
-        this->Renderer->WorldToDisplay();
-        this->Renderer->GetDisplayPoint(displayCoord);
+        Renderer->SetWorldPoint(center[0], center[1], center[2], 1.0);
+        Renderer->WorldToDisplay();
+        Renderer->GetDisplayPoint(displayCoord);
 
-		// check if the point is within the window
-        int screenX = static_cast<int>(displayCoord[0]);
-        int screenY = static_cast<int>(displayCoord[1]);
-        if (screenX < 0 || screenX >= windowSize[0] || screenY < 0 || screenY >= windowSize[1]) {
-            continue;
-        }
-
-		// get Z-buffer value
-        int zIndex = screenY * windowSize[0] + screenX;
-        double zBufferValue = zBufferData[zIndex];
-
-        if (displayCoord[2] - zBufferValue > tolerance) {
-			continue; // cell is occluded
-        }
-
+		// check if the cell cetroid is inside the lasso polygon
         if (IsPointInPolygon(displayCoord[0], displayCoord[1], LassoPoints)) {
-            this->SelectedCells->InsertUniqueId(cellId);
+            SelectedCells->InsertUniqueId(cellId);
+			CellColors->SetTuple3(cellId, 255, 0, 0); // highlight selected cell
         }
     }
 
-	// highlight selected cells
-    for (vtkIdType i = 0; i < this->SelectedCells->GetNumberOfIds(); ++i) {
-        vtkIdType cellId = this->SelectedCells->GetId(i);
-        CellColors->SetTuple3(cellId, 255, 0, 0);
-    }
-
+    // update scene
     Mesh->GetCellData()->SetScalars(CellColors);
     Mesh->Modified();
     Renderer->GetRenderWindow()->Render();

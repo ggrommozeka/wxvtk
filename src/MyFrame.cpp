@@ -27,7 +27,7 @@ END_EVENT_TABLE()
 MyFrame::MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size)
     : wxFrame(NULL, -1, title, pos, size)
 {
-    SetIcon(wxICON(mondrian));
+    //SetIcon(wxICON(mondrian));
 
     wxMenu* menuFile = new wxMenu;
     menuFile->Append(Load_STL, _T("&Load mesh\tCtrl-L"), _T("Load an STL file"));
@@ -53,7 +53,8 @@ MyFrame::MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size)
 
     SetMenuBar(menuBar);
 
-    m_pVTKWindow = new wxVTKRenderWindowInteractor(this, MY_VTK_WINDOW);
+    //m_pVTKWindow = new wxVTKRenderWindowInteractor(this, MY_VTK_WINDOW);
+	m_pVTKWindow = std::make_unique<wxVTKRenderWindowInteractor>(this, MY_VTK_WINDOW);
     m_pVTKWindow->UseCaptureMouseOn();
 
     ConstructVTK();
@@ -61,10 +62,6 @@ MyFrame::MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size)
     EnablePicking();
 }
 
-MyFrame::~MyFrame()
-{
-    if (m_pVTKWindow) m_pVTKWindow->Delete();
-}
 
 void MyFrame::ConstructVTK()
 {
@@ -261,6 +258,20 @@ void MyFrame::OnAbout(wxCommandEvent& WXUNUSED(event))
 
 void MyFrame::OnLoadSTL(wxCommandEvent& WXUNUSED(event))
 {
+	// reset selection variables: prevent exception if new mesh is loaded
+	if (originalMesh) {
+		originalMesh->Reset();
+	}
+    
+	if (cellColors) {
+		cellColors->Reset();
+	}
+    
+    if (selectedCells) {
+        selectedCells->Reset();
+    }
+
+    // load new mesh
     wxFileDialog openFileDialog(this, _T("Open 3D file"), "", "", _T("3D files (*.stl;*.obj)|*.stl;*.obj"), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
     if (openFileDialog.ShowModal() == wxID_CANCEL)
         return;
@@ -300,7 +311,7 @@ void MyFrame::OnLoadSTL(wxCommandEvent& WXUNUSED(event))
     }
     originalMesh->GetCellData()->SetScalars(cellColors);
 
-    pRenderer->RemoveAllViewProps();
+    
 
     double bounds[6];
     stlActor->GetBounds(bounds);
@@ -310,7 +321,7 @@ void MyFrame::OnLoadSTL(wxCommandEvent& WXUNUSED(event))
     pRenderer->GetActiveCamera()->SetFocalPoint(centerX, centerY, centerZ);
     pRenderer->GetActiveCamera()->SetPosition(centerX, centerY, centerZ + (bounds[5] - bounds[4]) * 2.0);
     pRenderer->GetActiveCamera()->SetViewUp(0.0, 1.0, 0.0);
-    pRenderer->ResetCamera();
+    //pRenderer->ResetCamera();
 
     pRenderer->AddActor(stlActor);
     pRenderer->ResetCamera();

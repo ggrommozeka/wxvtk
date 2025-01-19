@@ -25,6 +25,8 @@
 #include "MyInteractorStyle.h"
 #include "MyLassoInteractorStyle.h"
 
+#include <memory>
+
 
 #define MY_FRAME      101
 #define MY_VTK_WINDOW 102
@@ -33,7 +35,6 @@ class MyFrame : public wxFrame
 {
 public:
     MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size);
-    ~MyFrame();
 
     void OnQuit(wxCommandEvent& event);
     void OnAbout(wxCommandEvent& event);
@@ -49,7 +50,8 @@ protected:
     void EnablePicking();
 
 private:
-    wxVTKRenderWindowInteractor* m_pVTKWindow;
+    //wxVTKRenderWindowInteractor* m_pVTKWindow;
+    std::unique_ptr<wxVTKRenderWindowInteractor> m_pVTKWindow;
     vtkSmartPointer<vtkRenderer> pRenderer;
     vtkSmartPointer<vtkRenderWindow> pRenderWindow;
     vtkSmartPointer<vtkActor> stlActor;
